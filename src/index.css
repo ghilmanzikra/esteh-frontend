@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tambahan agar font default enak dilihat */
+body {
+  background-color: #F1F3E0; /* Warna Cream kita */
+}
