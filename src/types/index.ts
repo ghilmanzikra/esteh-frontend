@@ -3,7 +3,8 @@
 // Respon Login (Sesuai Console Log Backend)
 export interface LoginResponse {
   message: string;
-  access_token: string; // <--- GANTI INI (tadinya 'token')
+  token?: string;        // <--- TAMBAHAN: Backend kadang kirim ini
+  access_token?: string; // <--- Yang kita duga sebelumnya
   token_type: string;
   user: User;
 }

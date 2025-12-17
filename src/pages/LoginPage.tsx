@@ -37,8 +37,14 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
       console.log("Login Sukses!", response);
 
-      if (response.access_token) {
-        localStorage.setItem('token', response.access_token);
+      const token = response.token || response.access_token;
+
+      if (token) {
+        localStorage.setItem('token', token);
+        console.log("Token Tersimpan di LocalStorage:", token); // Log buat mastiin
+      } else {
+        console.error("Gawat! Token tidak ditemukan di response backend!", response);
+        throw new Error("Gagal menyimpan sesi login (Token hilang).");
       }
 
       let userRole = 'karyawan'; 
@@ -64,7 +70,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       }, 2000);
 
     } catch (err: any) {
-      console.error("Login Error:", err);
+      console.error("Login Error:", err); // Lihat di console, expand object errornya
+      // Tambahkan alert detail biar tau pesan dari backend
+      alert(`Gagal Login: ${err.message}`); 
       setError(err.message || 'Login gagal. Periksa koneksi atau password.');
       setIsLoading(false);
     }

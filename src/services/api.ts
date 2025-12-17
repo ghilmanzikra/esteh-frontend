@@ -31,7 +31,16 @@ const fetcher = async <T>(endpoint: string, options: RequestInit = {}): Promise<
   };
 
   const response = await fetch(`${BASE_URL}${endpoint}`, config);
-  const data = await response.json();
+  
+  // Handle jika response bukan JSON (kadang error server balikin HTML)
+  const text = await response.text();
+  let data;
+  try {
+      data = JSON.parse(text);
+  } catch (e) {
+      // Jika gagal parse JSON, lempar error dengan text aslinya
+      throw new Error(`Server Error (${response.status}): ${text.substring(0, 50)}...`);
+  }
 
   if (!response.ok) {
     throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
@@ -42,7 +51,6 @@ const fetcher = async <T>(endpoint: string, options: RequestInit = {}): Promise<
 
 // ============================================================================
 // 📦 KUMPULAN ENDPOINT (SERVICE LAYER)
-// Semua endpoint dari temanmu kita daftarkan di sini.
 // ============================================================================
 
 export const api = {
@@ -113,15 +121,12 @@ export const api = {
       method: 'DELETE' 
     }),  
 
-   // 1. Get Data Tabel (JSON)
   getLaporanPendapatan: (startDate: string, endDate: string) => 
     fetcher<LaporanResponse>(`/laporan/pendapatan?start_date=${startDate}&end_date=${endDate}`, { method: 'GET' }),
 
-  // 2. Download Excel (BLOB)
-  // Ini butuh perlakuan khusus karena response-nya bukan JSON, tapi File (Blob)
   downloadLaporan: async (startDate: string, endDate: string) => {
     const token = localStorage.getItem('token');
-    const response = await fetch(`/api/laporan/export?start_date=${startDate}&end_date=${endDate}`, {
+    const response = await fetch(`${BASE_URL}/laporan/export?start_date=${startDate}&end_date=${endDate}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -130,12 +135,11 @@ export const api = {
 
     if (!response.ok) throw new Error("Gagal download laporan");
     
-    // Convert ke Blob (Binary Large Object) lalu buat link download palsu
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Laporan_EsTeh_${startDate}_${endDate}.xlsx`; // Nama file
+    a.download = `Laporan_EsTeh_${startDate}_${endDate}.xlsx`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -146,15 +150,15 @@ export const api = {
     method: 'GET' 
   }),
   
-  // Create Produk pakai FormData (untuk upload gambar)
   createProduk: (formData: FormData) => fetcher<any>('/produk', { 
     method: 'POST', 
     body: formData 
   }),
+  
   updateProduk: (id: number, formData: FormData) => fetcher<any>(`/produk/${id}`, { 
-    method: 'PUT', 
+    method: 'POST', // Backend PHP kadang butuh POST dengan _method: PUT di FormData
     body: formData 
-  }), // Endpoint PUT biasanya untuk update
+  }),
 
   deleteProduk: (id: number) => fetcher<any>(`/produk/${id}`, { 
     method: 'DELETE' 
@@ -176,12 +180,46 @@ export const api = {
   }),
 
   // --- GUDANG FEATURES ---
+  // 1. Stok Gudang & Bahan
   getStokGudang: () => 
-    fetcher<any>('/gudang/stok', { method: 'GET' }),
+    fetcher<any>('/gudang/stok', { 
+      method: 'GET' 
+    }),
+
+  getBahan: () => 
+    fetcher<any>('/gudang/bahan', { 
+      method: 'GET' 
+    }),
+
+  // 2. Barang Masuk (Restock Gudang)
+  getBarangMasuk: () => 
+    fetcher<any>('/gudang/barang-masuk', { 
+      method: 'GET' 
+    }),
 
   createBarangMasuk: (body: any) => 
     fetcher<any>('/gudang/barang-masuk', { 
       method: 'POST', 
       body: JSON.stringify(body) 
+    }),
+
+  // 3. Barang Keluar (Kirim ke Outlet)
+  // FIX: Kita biarkan endpoint ini, tapi nanti kita handle errornya di view jika backend belum siap
+  getBarangKeluar: () => 
+    fetcher<any>('/gudang/barang-keluar', { 
+      method: 'GET' 
+    }),
+
+  // 4. Permintaan Stok dari Outlet (Inbox Gudang)
+  // FIX: Menggunakan endpoint umum /permintaan-stok karena endpoint /gudang/permintaan-stok error 405
+  getPermintaanStok: () => 
+    fetcher<any>('/permintaan-stok', { 
+      method: 'GET' 
+    }),
+
+  approvePermintaan: (id: number) => 
+    fetcher<any>(`/gudang/permintaan-stok/${id}`, { 
+      method: 'PUT', 
+      body: JSON.stringify({ status: 'approved' }) 
     }),
 };
