@@ -2,9 +2,13 @@ import React from 'react';
 import { 
   LayoutGrid, Package, ClipboardList, Settings, Warehouse, 
   LayoutDashboard, ArrowDownToLine, ArrowUpFromLine, PackageSearch, 
-  Store, Users, FileText, LogOut, Truck, BarChart3
+  Store, Users, FileText, LogOut, Truck, BarChart3, History, Coffee
 } from 'lucide-react';
-import logoEsTeh from '../assets/logo.png'; 
+
+// --- CATATAN ---
+// Import logo di-comment dulu agar preview di Canvas tidak error karena file gambar tidak ditemukan.
+// Silakan UNCOMMENT baris di bawah ini saat di project lokal kamu.
+// import logoEsTeh from '../assets/logo.png'; 
 
 interface SidebarProps {
   role: 'karyawan' | 'gudang' | 'owner';
@@ -29,9 +33,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen, toggleMobile, onLogout 
 }) => {
   
+  // Definisi Menu (Sudah diperbaiki, tidak ada duplikat)
   const menus: Record<string, MenuItem[]> = {
     karyawan: [
       { id: 'transaksi', label: 'Kasir / Transaksi', icon: <LayoutGrid size={20} /> },
+      { id: 'riwayat', label: 'Riwayat Transaksi', icon: <History size={20} /> },
       { id: 'produk', label: 'Kelola Menu', icon: <ClipboardList size={20} /> },
       { id: 'stok', label: 'Stok & Request', icon: <Package size={20} /> },
       { id: 'penerimaan', label: 'Terima Barang', icon: <Truck size={20} /> },
@@ -44,7 +50,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     ],
     owner: [
       { id: 'dashboard', label: 'Executive Dashboard', icon: <LayoutDashboard size={20} /> },
-      { id: 'stok', label: 'Stok All Outlet', icon: <BarChart3 size={20} /> }, // <-- NEW USE CASE 12
+      { id: 'stok', label: 'Stok All Outlet', icon: <BarChart3 size={20} /> },
       { id: 'outlet', label: 'Manajemen Outlet', icon: <Store size={20} /> },
       { id: 'karyawan', label: 'Data Karyawan', icon: <Users size={20} /> },
       { id: 'laporan', label: 'Laporan Keuangan', icon: <FileText size={20} /> },
@@ -56,16 +62,22 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
+      {/* Overlay Mobile */}
       {isMobileOpen && (
         <div className="fixed inset-0 bg-black/40 z-40 md:hidden backdrop-blur-sm" onClick={toggleMobile}></div>
       )}
 
+      {/* Sidebar Container */}
       <div className={`fixed top-0 left-0 h-full w-[280px] bg-white border-r border-[#E3E9D5] flex flex-col z-50 transition-transform duration-300 shadow-xl shadow-[#A1BC98]/5 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         
-        {/* Header */}
+        {/* Header Logo */}
         <div className="flex flex-col items-center justify-center pt-8 pb-6 border-b border-[#F1F3E0]">
-          <div className="w-20 h-20 rounded-full bg-[#F1F3E0] p-1.5 shadow-sm mb-3">
-             <img src={logoEsTeh} alt="Es Teh Favorit" className="w-full h-full object-contain rounded-full" />
+          <div className="w-20 h-20 rounded-full bg-[#F1F3E0] p-1.5 shadow-sm mb-3 overflow-hidden flex items-center justify-center">
+             {/* Placeholder Logo (Gunakan Ikon Coffee sementara). 
+                 Nanti ganti dengan <img> asli kamu.
+             */}
+             {/* <img src={logoEsTeh} alt="Es Teh Favorit" className="w-full h-full object-contain rounded-full" /> */}
+             <Coffee size={40} className="text-[#A1BC98]" />
           </div>
           <h2 className="font-bold text-[#4A5347] text-lg">Es Teh Favorit</h2>
           <span className="px-3 py-1 bg-[#F1F3E0] text-[#A1BC98] text-xs font-bold rounded-full mt-1 uppercase tracking-wider">
@@ -73,7 +85,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </span>
         </div>
 
-        {/* Menu */}
+        {/* Menu Navigation */}
         <nav className="flex-1 p-4 overflow-y-auto space-y-1">
           {currentMenu.map((item) => (
             <button

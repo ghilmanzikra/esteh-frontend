@@ -40,13 +40,31 @@ export interface Produk {
   komposisi?: any[]; // Detail bahan
 }
 
-// --- NEW: Stok Outlet ---
+// Tipe Data Bahan Baku (Untuk Gudang & Stok)
+export interface BahanBaku {
+  id: number;
+  nama: string;
+  satuan: string;
+  stok_gudang?: number; // Stok di gudang pusat
+}
+
+// UPDATE: Struktur Bahan agar sesuai object
+export interface Bahan {
+    id: number;
+    nama: string;
+    satuan: string;
+    stok_minimum_gudang: number;
+    stok_minimum_outlet: number;
+}
+
+// UPDATE: StokOutletItem menyesuaikan respon API
 export interface StokOutletItem {
   id: number;
-  bahan: string;     // Nama bahan
+  outlet_id: number;
+  bahan_id: number;
   stok: number;
-  satuan: string;
-  status: 'Aman' | 'Kritis' | 'Menipis';
+  status?: 'Aman' | 'Menipis' | 'Kritis'; // Logic frontend
+  bahan: BahanBaku; // Relasi ke bahan baku
 }
 
 // --- UPDATE: Tipe Data Outlet (Sesuai API Docs) ---
@@ -100,4 +118,48 @@ export interface LaporanResponse {
   periode: string;
   total_pendapatan: number;
   detail_per_hari: LaporanItem[]; // <--- Kuncinya di sini
+}
+
+// Tipe Data Transaksi (Payload & Response)
+export interface TransaksiItem {
+  id?: number;
+  produk_id: number;
+  quantity: number;
+  harga_satuan: number;
+  subtotal: number;
+  produk?: Produk; // Untuk display riwayat
+}
+
+export interface Transaksi {
+  id: number;
+  user_id: number;
+  outlet_id: number;
+  total_harga: number;
+  bayar: number;
+  kembali: number;
+  metode_bayar: 'tunai' | 'qris';
+  status: 'pending' | 'selesai' | 'batal';
+  tanggal: string; // ISO String
+  items: TransaksiItem[];
+}
+
+// Payload untuk Create Transaksi
+export interface CreateTransaksiPayload {
+  outlet_id: number;
+  total_harga: number;
+  bayar: number;
+  metode_bayar: 'tunai' | 'qris';
+  items: {
+    produk_id: number;
+    quantity: number;
+    harga_satuan: number; // Snapshot harga saat transaksi
+  }[];
+}
+
+// Tipe Data Laporan
+export interface LaporanSummary {
+  pendapatan_harian: number;
+  pendapatan_bulanan: number;
+  total_transaksi: number;
+  produk_terlaris: { nama: string; total: number }[];
 }

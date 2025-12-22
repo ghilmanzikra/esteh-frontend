@@ -244,7 +244,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         </form>
 
         <div className="mt-12 text-[11px] text-[#778873] opacity-70 font-medium">
-          © 2025 Es Teh Favorit Indonesia. <br/>Dibuat untuk tugas kuliah.
+          © 2025 Es Teh Favorit Indonesia.
         </div>
 
       </div>
