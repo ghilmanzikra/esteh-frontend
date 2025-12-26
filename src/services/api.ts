@@ -1,21 +1,15 @@
 import { LoginResponse, User, Produk, Outlet, DashboardResponse, OutletResponse, UserResponse, LaporanResponse, StokOutletItem } from '../types';
 
-// ============================================================================
-// 🌐 KONFIGURASI URL (PENTING!)
-// ============================================================================
-// Cara kerja:
-// 1. Cek apakah ada setting di file .env (Vite Environment)
-// 2. Jika tidak ada, gunakan Localhost sebagai default (agar aman saat dev)
-// 3. Opsi Production disediakan sebagai fallback terakhir
-
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
-
-// 💡 TIPS DEBUGGING:
-// Cek di Console browser, url mana yang dipakai
-console.log("🔗 API Base URL:", BASE_URL);
+// 1. Konfigurasi Dasar
+// BASE_URL sekarang bisa dikonfigurasi lewat env var VITE_API_BASE_URL.
+// Jika tidak diset, gunakan URL produksi default.
+const DEFAULT_BASE_URL = 'https://esteh-backend-production.up.railway.app/api';
+const rawBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+const BASE_URL = rawBase ? rawBase.replace(/\/$/, '') : DEFAULT_BASE_URL;
+// contoh .env: VITE_API_BASE_URL=http://localhost:5173/api
 
 // ============================================================================
-// 🛠️ SMART FETCHER (Engine Utama)
+// 🛠️ SMART FETCHER (Engine Utama) - DIPERTAHANKAN & DIPERBAIKI
 // ============================================================================
 
 const fetcher = async <T = any>(endpoint: string, options: RequestInit = {}): Promise<T> => {
@@ -23,7 +17,7 @@ const fetcher = async <T = any>(endpoint: string, options: RequestInit = {}): Pr
   
   // 1. Siapkan Headers default
   const headers: Record<string, string> = {
-    'Accept': 'application/json',
+    'Accept': 'application/json', // Selalu terima JSON
     ...(options.headers as Record<string, string>),
   };
 
@@ -33,6 +27,8 @@ const fetcher = async <T = any>(endpoint: string, options: RequestInit = {}): Pr
   }
 
   // 3. Handle Content-Type Otomatis
+  // Jika body adalah FormData, browser otomatis set boundary, jadi JANGAN set manual.
+  // Jika bukan FormData, set application/json.
   if (!(options.body instanceof FormData)) {
      if (!headers['Content-Type']) {
         headers['Content-Type'] = 'application/json';
@@ -45,39 +41,36 @@ const fetcher = async <T = any>(endpoint: string, options: RequestInit = {}): Pr
   };
 
   try {
+    // console.log(`[API REQUEST] ${endpoint}`, config); // Debugging Log
+
     const response = await fetch(`${BASE_URL}${endpoint}`, config);
     
     // 4. Handle Response Text vs JSON
     const text = await response.text();
-    let data;
-    
+    let data: any = null;
+    // Try parse JSON, otherwise keep raw text
     try {
-        if (text) {
-            data = JSON.parse(text);
-        } else {
-            data = {}; 
-        }
+      if (text) {
+        data = JSON.parse(text);
+      } else {
+        data = {};
+      }
     } catch (e) {
-        // Jika server error HTML (bukan JSON), lempar error agar ketahuan
-        throw new Error(`Server Error (${response.status}): Respon bukan JSON valid.`);
+      data = text; // keep raw text for debugging
     }
 
     if (!response.ok) {
-       // Tangkap pesan error spesifik dari backend jika ada
-       throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
+       // Build informative error message
+       const serverMessage = (typeof data === 'object' && data && data.message) ? data.message : (typeof data === 'string' ? data : null);
+       const errMsg = serverMessage || `Error ${response.status}: ${response.statusText}`;
+       console.error(`[API Response Error] ${endpoint} status=${response.status} body=`, data);
+       throw new Error(errMsg);
     }
 
     return data as T;
 
   } catch (error: any) {
-    // 🚨 LOG ERROR YANG LEBIH JELAS
-    console.error(`❌ [API Error] ${endpoint}:`, error.message);
-    
-    // Jika errornya Network Error (Server mati/salah alamat)
-    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-        throw new Error("Gagal menghubungi server. Pastikan backend (Laravel) sudah jalan di port 8000 atau URL Railway benar.");
-    }
-    
+    console.error(`[API Error] ${endpoint}:`, error);
     throw error;
   }
 };
@@ -109,7 +102,7 @@ export const api = {
     fetcher<DashboardResponse>('/dashboard', { method: 'GET' }),
     
   getOutlets: () => 
-    fetcher<OutletResponse[]>('/outlets', { method: 'GET' }),
+    fetcher<OutletResponse | Outlet[]>('/outlets', { method: 'GET' }),
     
   getOutletDetail: (id: number) =>
     fetcher<Outlet>(`/outlets/${id}`, { method: 'GET' }),
@@ -130,7 +123,7 @@ export const api = {
     fetcher<any>(`/outlets/${id}`, { method: 'DELETE' }),
 
   getUsers: () => 
-    fetcher<UserResponse>('/users', { method: 'GET' }),
+    fetcher<UserResponse | User[]>('/users', { method: 'GET' }),
 
   createUser: (body: any) => 
     fetcher<User>('/users', { 
@@ -194,6 +187,20 @@ export const api = {
     return Array.isArray(res) ? res : (res.data || []);
   },
 
+  // Untuk Karyawan: akses bahan yang relevan untuk outlet (menggunakan stok/outlet)
+  // Menghindari pemanggilan /gudang/bahan yang role-restricted
+  getBahanOutlet: async () => {
+    const res = await fetcher<any>('/stok/outlet', { method: 'GET' });
+    return Array.isArray(res) ? res : (res.data || []);
+  },
+
+  // Untuk Karyawan: ambil seluruh list bahan yang tersedia di gudang
+  // Sesuai dokumentasi baru, karyawan dapat mengakses endpoint public `/bahan-gudang`
+  getBahanGudang: async () => {
+    const res = await fetcher<any>('/bahan-gudang', { method: 'GET' });
+    return Array.isArray(res) ? res : (res.data || []);
+  },
+
   // Request Stok ke Gudang (Sesuai Mobile)
   requestStok: (data: { bahan_id: number; jumlah: number }) => 
     fetcher<any>('/permintaan-stok', { 
@@ -203,17 +210,23 @@ export const api = {
 
   // --- KARYAWAN: TRANSAKSI (KASIR) ---
   // Membuat transaksi baru (Checkout)
-  createTransaksi: (payload: any) => 
-    fetcher<any>('/transaksi', { 
-       method: 'POST', 
-       body: JSON.stringify(payload)
-    }),
+  createTransaksi: (payload: any | FormData) => {
+    // Jika FormData (untuk bukti_qris/file), kirim langsung tanpa JSON.stringify
+    if (payload instanceof FormData) {
+      return fetcher<any>('/transaksi', { method: 'POST', body: payload });
+    }
+    return fetcher<any>('/transaksi', { method: 'POST', body: JSON.stringify(payload) });
+  },
 
   // Endpoint Mobile: GET /transaksi (Filter outlet otomatis by token)
   getTransaksi: async () => {
       const res = await fetcher<any>('/transaksi', { method: 'GET' });
       return Array.isArray(res) ? res : (res.data || []);
   },
+
+  // Hapus / Batalkan transaksi (mengembalikan stok oleh backend)
+  deleteTransaksi: (id: number) =>
+    fetcher<any>(`/transaksi/${id}`, { method: 'DELETE' }),
 
 
   // --- GUDANG FEATURES (Placeholder / Persiapan) ---
@@ -254,6 +267,10 @@ export const api = {
       method: 'GET' 
     }), // Endpoint list permintaan untuk gudang
 
+  // Permintaan Stok khusus untuk GUDANG (role gudang) => gunakan namespace /gudang
+  getPermintaanStokGudang: () =>
+    fetcher<any>('/gudang/permintaan-stok', { method: 'GET' }),
+
   approvePermintaan: (id: number) => 
     fetcher<any>(`/gudang/permintaan-stok/${id}`, { 
       method: 'PUT', 
@@ -261,4 +278,34 @@ export const api = {
         status: 'approved' 
       }) 
     }),
+  
+  rejectPermintaan: (id: number) =>
+    fetcher<any>(`/gudang/permintaan-stok/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'rejected' })
+    }),
+  
+  // Karyawan/Gudang: Konfirmasi penerimaan barang (opsional bukti_foto)
+  terimaBarangKeluar: (id: number, payload?: FormData) => {
+    if (payload instanceof FormData) {
+      return fetcher<any>(`/gudang/barang-keluar/${id}/terima`, { method: 'POST', body: payload });
+    }
+    return fetcher<any>(`/gudang/barang-keluar/${id}/terima`, { method: 'POST', body: JSON.stringify(payload) });
+  },
+  
+  // Permintaan Stok: update / delete (karyawan)
+  updatePermintaan: (id: number, body: any) =>
+    fetcher<any>(`/permintaan-stok/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  deletePermintaan: (id: number) =>
+    fetcher<any>(`/permintaan-stok/${id}`, { method: 'DELETE' }),
+
+  // Kategori: untuk karyawan gunakan `/kategori` (lihat dokumentasi baru)
+  // Backend juga menyediakan `/gudang/kategori` untuk akun gudang.
+  getKategori: () =>
+    fetcher<any>('/kategori', { method: 'GET' }),
+
+  // Produk update (PUT /produk/{id}) - menerima FormData for images
+  updateProduk: (id: number, formData: FormData) =>
+    fetcher<any>(`/produk/${id}`, { method: 'PUT', body: formData }),
 };

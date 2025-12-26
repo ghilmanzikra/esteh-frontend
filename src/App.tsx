@@ -24,6 +24,15 @@ function App() {
   };
 
   const handleLogout = () => {
+    // Call API logout (best-effort) and clear token
+    try {
+      // fire-and-forget
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      (async () => { await (await import('./services/api')).api.logout(); })();
+    } catch (e) {
+      // ignore
+    }
+    localStorage.removeItem('token');
     setActiveRole(null);
     setIsMobileOpen(false);
   }

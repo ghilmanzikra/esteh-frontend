@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Package, TrendingUp, ArrowUpFromLine, ArrowDownToLine, AlertTriangle, Loader2 } from 'lucide-react';
+import { Package, ArrowUpFromLine, ArrowDownToLine, AlertTriangle, Loader2 } from 'lucide-react';
 import { api } from '../../services/api';
 
 const OverviewView = () => {
@@ -58,22 +58,25 @@ const OverviewView = () => {
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Item', val: `${stats.total_stok} Jenis`, icon: <Package />, color: 'bg-[#E3E9D5] text-[#A1BC98]' },
-          { label: 'Barang Masuk', val: `${stats.barang_masuk} PO`, sub: 'Total Riwayat', icon: <ArrowDownToLine />, color: 'bg-[#E3E9D5] text-[#A1BC98]' },
-          { label: 'Barang Keluar', val: `${stats.barang_keluar} Kiriman`, sub: 'Total Riwayat', icon: <ArrowUpFromLine />, color: 'bg-[#E3E9D5] text-[#A1BC98]' },
-          { label: 'Stok Menipis', val: `${stats.stok_kritis} Item`, sub: 'Perlu Restock', icon: <AlertTriangle />, color: 'bg-[#FFE9B8] text-[#6b5310]' },
-        ].map((stat, idx) => (
-          <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border border-[#E3E9D5] flex items-center gap-4">
-            <div className={`p-3 rounded-xl ${stat.color}`}>
-              {React.cloneElement(stat.icon as React.ReactElement, { size: 24 })}
+          { label: 'Total Item', val: `${stats.total_stok} Jenis`, Icon: Package, color: 'bg-[#E3E9D5] text-[#A1BC98]' },
+          { label: 'Barang Masuk', val: `${stats.barang_masuk} PO`, sub: 'Total Riwayat', Icon: ArrowDownToLine, color: 'bg-[#E3E9D5] text-[#A1BC98]' },
+          { label: 'Barang Keluar', val: `${stats.barang_keluar} Kiriman`, sub: 'Total Riwayat', Icon: ArrowUpFromLine, color: 'bg-[#E3E9D5] text-[#A1BC98]' },
+          { label: 'Stok Menipis', val: `${stats.stok_kritis} Item`, sub: 'Perlu Restock', Icon: AlertTriangle, color: 'bg-[#FFE9B8] text-[#6b5310]' },
+        ].map((stat, idx) => {
+          const Icon = stat.Icon as any;
+          return (
+            <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border border-[#E3E9D5] flex items-center gap-4">
+              <div className={`p-3 rounded-xl ${stat.color}`}>
+                <Icon size={24} />
+              </div>
+              <div>
+                <p className="text-sm text-[#778873]">{stat.label}</p>
+                <h4 className="text-2xl font-bold text-[#4A5347]">{stat.val}</h4>
+                {stat.sub && <span className="text-xs text-[#778873]/80">{stat.sub}</span>}
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-[#778873]">{stat.label}</p>
-              <h4 className="text-2xl font-bold text-[#4A5347]">{stat.val}</h4>
-              {stat.sub && <span className="text-xs text-[#778873]/80">{stat.sub}</span>}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       
       {/* Activity Log Placeholder */}

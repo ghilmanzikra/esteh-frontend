@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import logoEsTeh from '../assets/logo.png';
-import { Eye, EyeOff } from 'lucide-react'; // Kita tidak butuh CheckCircle lagi, kita bikin manual
+import { Eye, EyeOff, Coffee } from 'lucide-react'; // Use placeholder icon instead of missing image
 import { api } from '../services/api'; 
 
 interface LoginPageProps {
@@ -177,7 +176,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
         <div className="flex flex-col items-center mb-8">
           <div className="w-24 h-24 rounded-full bg-[#F1F3E0] p-2 mb-4 shadow-sm flex items-center justify-center">
-            <img src={logoEsTeh} alt="Logo Es Teh Favorit" className="w-full h-full object-contain rounded-full" />
+            <Coffee size={48} className="text-[#A1BC98]" />
           </div>
           <h1 className="text-3xl font-bold text-[#4A5347] mt-2">Selamat Datang Di</h1>
           <p className="text-[#A1BC98] font-medium mt-1">Es Teh Favorit Indonesia</p>

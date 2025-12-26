@@ -6,6 +6,7 @@ import TransaksiView from './TransaksiView';
 import ProdukView from './ProdukView';
 import StokView from './StokView';
 import RiwayatTransaksi from './RiwayatTransaksi'; // Pastikan nama file ini benar
+import PengajuanView from './PengajuanView';
 
 interface KaryawanPageProps {
   isMobileOpen: boolean;
@@ -27,15 +28,7 @@ const KaryawanPage: React.FC<KaryawanPageProps> = ({ isMobileOpen, toggleMobile,
       case 'stok':
         return <StokView />;
       case 'penerimaan':
-        // Penerimaan belum ada View khususnya, jadi kita pakai inline JSX dulu tidak apa-apa
-        return (
-          <div className="flex items-center justify-center h-full text-[#778873] bg-white rounded-3xl border border-[#E3E9D5] p-10 animate-in fade-in zoom-in duration-300">
-            <div className="text-center">
-              <h2 className="text-xl font-bold mb-2">Fitur Penerimaan Barang</h2>
-              <p>Halaman ini akan menampilkan daftar pengiriman dari gudang untuk dikonfirmasi.</p>
-            </div>
-          </div>
-        );
+        return <PengajuanView />;
       default:
         return <TransaksiView />;
     }

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Image as ImageIcon, Save, X, Coffee } from 'lucide-react';
+import { Edit3 } from 'lucide-react';
 import { api } from '../../services/api';
 
 // Interface lokal agar aman
@@ -32,6 +33,9 @@ interface Produk {
 const ProdukView = () => {
   const [products, setProducts] = useState<Produk[]>([]);
   const [bahanOptions, setBahanOptions] = useState<StokOutletItem[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [activeCategory, setActiveCategory] = useState<number | null>(null);
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   // State Modal & Form
@@ -42,6 +46,7 @@ const ProdukView = () => {
   const [nama, setNama] = useState('');
   const [harga, setHarga] = useState('');
   const [gambar, setGambar] = useState<File | null>(null);
+  const [kategoriId, setKategoriId] = useState<number | null>(null);
   
   const [komposisiList, setKomposisiList] = useState<KomposisiInput[]>([
     { bahan_id: 0, quantity: 0 }
@@ -57,6 +62,16 @@ const ProdukView = () => {
       const resStok = await api.getStokOutlet() as any;
       const dataStok = Array.isArray(resStok) ? resStok : resStok.data || [];
       setBahanOptions(dataStok);
+
+      // fetch categories (if backend exposes them)
+      try {
+        const resCat = await api.getKategori();
+        const dataCat = Array.isArray(resCat) ? resCat : (resCat.data || []);
+        setCategories(dataCat);
+      } catch (e) {
+        // ignore if not available for this role
+        console.debug('Kategori tidak tersedia atau tidak diizinkan', e);
+      }
 
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -106,7 +121,6 @@ const ProdukView = () => {
       resetForm(); // Reset form dulu
       setIsModalOpen(false); // Baru tutup modal
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -126,22 +140,25 @@ const ProdukView = () => {
       const formData = new FormData();
       formData.append('nama', nama);
       formData.append('harga', harga);
+      if (kategoriId) formData.append('kategori_id', String(kategoriId));
       
       // Foto sekarang OPSIONAL. Hanya append jika ada.
       if (gambar) {
         formData.append('image', gambar); // Mobile pakai key 'image' biasanya, cek backend
       }
 
-      // Logika Komposisi Array untuk Backend Laravel/Node umumnya:
-      validKomposisi.forEach((item, index) => {
-        formData.append(`komposisi[${index}][bahan_id]`, item.bahan_id.toString());
-        formData.append(`komposisi[${index}][quantity]`, item.quantity.toString());
-      });
+      // Pass komposisi as JSON string (backend docs expect items/komposisi JSON)
+      formData.append('komposisi', JSON.stringify(validKomposisi));
 
       console.log("Sending Form Data...");
-      await api.createProduk(formData);
-      
-      alert("Produk berhasil dibuat! 🎉");
+      if (editingProductId) {
+        await api.updateProduk(editingProductId, formData);
+        alert("Produk berhasil diupdate! 🎉");
+        setEditingProductId(null);
+      } else {
+        await api.createProduk(formData);
+        alert("Produk berhasil dibuat! 🎉");
+      }
       handleCloseModal(); // Reset & Close
       fetchData(); 
 
@@ -161,6 +178,18 @@ const ProdukView = () => {
         alert("Gagal hapus produk");
       }
     }
+  };
+
+  const handleEditProduct = (p: Produk) => {
+    setEditingProductId(p.id);
+    setIsModalOpen(true);
+    setNama(p.nama || '');
+    setHarga(String(p.harga || ''));
+    setPreviewImage(p.image_url || null);
+    setKategoriId((p as any).kategori_id || (p as any).kategori?.id || null);
+    // prefill komposisi
+    const kom = (p.komposisi || []).map((k: any) => ({ bahan_id: k.bahan_id || k.bahan?.id, quantity: Number(k.quantity || k.qty || 0) }));
+    setKomposisiList(kom.length ? kom : [{ bahan_id: 0, quantity: 0 }]);
   };
 
   const resetForm = () => {
@@ -200,11 +229,20 @@ const ProdukView = () => {
       </div>
 
       {/* GRID PRODUK */}
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => { setActiveCategory(null); }} className={`px-3 py-1 rounded ${activeCategory===null ? 'bg-[#A1BC98] text-white' : 'bg-white border'}`}>Semua</button>
+          {categories.map(c => (
+            <button key={c.id} onClick={() => setActiveCategory(c.id)} className={`px-3 py-1 rounded ${activeCategory===c.id ? 'bg-[#A1BC98] text-white' : 'bg-white border'}`}>{c.nama}</button>
+          ))}
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex justify-center p-10"><span className="loading loading-spinner text-[#4A5347]"></span></div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {products.map((produk) => (
+          {products.filter(p => activeCategory ? ((p as any).kategori_id === activeCategory || (p as any).kategori?.id === activeCategory) : true).map((produk) => (
             <div key={produk.id} className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow border border-[#E8ECE8] flex flex-col">
               <div className="h-48 rounded-xl bg-[#F5F7F5] mb-4 overflow-hidden relative group">
                 {produk.image_url ? (
@@ -220,9 +258,14 @@ const ProdukView = () => {
                 >
                   <Trash2 size={16} />
                 </button>
+                <button onClick={() => handleEditProduct(produk)} className="absolute top-2 right-12 p-2 bg-[#4A53447f] text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md">
+                  <Edit3 size={16} />
+                </button>
               </div>
-              
-              <h3 className="font-bold text-lg text-[#2C3E2D] mb-1">{produk.nama}</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-bold text-lg text-[#2C3E2D] mb-1">{produk.nama}</h3>
+                <div className="text-xs px-2 py-1 rounded bg-[#F5F7F5] text-[#5A6C5B]">{(produk as any).kategori?.nama || (produk as any).kategori_nama || ''}</div>
+              </div>
               <p className="text-[#A1BC98] font-bold">Rp {Number(produk.harga).toLocaleString('id-ID')}</p>
               
               <div className="mt-4 pt-4 border-t border-dashed border-gray-200">
@@ -248,7 +291,7 @@ const ProdukView = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in duration-200">
             <div className="sticky top-0 bg-white p-6 border-b border-gray-100 flex justify-between items-center z-10">
-              <h2 className="text-xl font-bold text-[#2C3E2D]">Buat Menu Baru</h2>
+              <h2 className="text-xl font-bold text-[#2C3E2D]">{editingProductId ? 'Edit Produk' : 'Buat Menu Baru'}</h2>
               <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                 <X size={20} className="text-gray-500" />
               </button>
@@ -303,6 +346,13 @@ const ProdukView = () => {
                             placeholder="0"
                             className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#A1BC98] focus:ring-2 focus:ring-[#A1BC98]/20 outline-none transition-all font-mono"
                         />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-semibold text-[#5A6C5B]">Kategori</label>
+                      <select value={kategoriId ?? ''} onChange={(e) => setKategoriId(e.target.value ? Number(e.target.value) : null)} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white">
+                        <option value="">Pilih kategori (opsional)</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.nama}</option>)}
+                      </select>
                     </div>
                 </div>
               </div>

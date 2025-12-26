@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, Minus, Trash2, ShoppingCart, Banknote, QrCode, Loader2, Search, Coffee, CreditCard, Save } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Minus, Trash2, ShoppingCart, Banknote, Search, Coffee, CreditCard, Save } from 'lucide-react';
 import { api } from '../../services/api';
 
 
@@ -18,10 +18,15 @@ interface CartItem extends Produk {
 const TransaksiView = () => {
   const [products, setProducts] = useState<Produk[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [_stokOutlet, setStokOutlet] = useState<any[]>([]);
+  const [availability, setAvailability] = useState<Record<number, boolean>>({});
   const [search, setSearch] = useState('');
   const [metodeBayar, setMetodeBayar] = useState<'TUNAI' | 'QRIS'>('TUNAI');
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false); // State loading checkout
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [qrisFile, setQrisFile] = useState<File | null>(null);
+  const [uangDibayar, setUangDibayar] = useState<number | null>(null);
 
   // Fetch Produk dari API
   const fetchProduk = async () => {
@@ -30,6 +35,31 @@ const TransaksiView = () => {
       const res = await api.getProduk() as any;
       const data = Array.isArray(res) ? res : res.data || [];
       setProducts(data);
+      // fetch stok outlet to compute availability
+      try {
+        const stok = await api.getStokOutlet();
+        setStokOutlet(stok || []);
+        // compute availability
+        const availMap: Record<number, boolean> = {};
+        data.forEach((p: any) => {
+          const komposisi = p.komposisi || p.komposisi_produk || [];
+          if (!Array.isArray(komposisi) || komposisi.length === 0) {
+            availMap[p.id] = true; // assume available if no komposisi
+            return;
+          }
+          const ok = komposisi.every((k: any) => {
+            const bahanId = k.bahan_id ?? k.id ?? k.bahan?.id;
+            const needed = Number(k.quantity ?? k.qty ?? k.quantity_produk ?? 1);
+            const stokItem = stok.find((s: any) => s.bahan_id === bahanId || (s.bahan && s.bahan.id === bahanId));
+            const availableQty = stokItem ? Number(stokItem.stok ?? stokItem.jumlah ?? 0) : 0;
+            return availableQty >= needed;
+          });
+          availMap[p.id] = ok;
+        });
+        setAvailability(availMap);
+      } catch (e) {
+        console.warn('Gagal ambil stok outlet untuk availability', e);
+      }
     } catch (err) {
       console.error("Gagal ambil produk", err);
     } finally {
@@ -41,8 +71,49 @@ const TransaksiView = () => {
     fetchProduk();
   }, []);
 
+  useEffect(() => {
+    // refresh stok & availability when transactions change
+    const handler = () => {
+      (async () => {
+        try {
+          const stok = await api.getStokOutlet();
+          setStokOutlet(stok || []);
+          // recompute availability against current products
+          const availMap: Record<number, boolean> = {};
+          products.forEach((p: any) => {
+            const komposisi = p.komposisi || p.komposisi_produk || [];
+            if (!Array.isArray(komposisi) || komposisi.length === 0) { availMap[p.id] = true; return; }
+            const ok = komposisi.every((k: any) => {
+              const bahanId = k.bahan_id ?? k.id ?? k.bahan?.id;
+              const needed = Number(k.quantity ?? k.qty ?? 1);
+              const stokItem = stok.find((s: any) => s.bahan_id === bahanId || (s.bahan && s.bahan.id === bahanId));
+              const availableQty = stokItem ? Number(stokItem.stok ?? stokItem.jumlah ?? 0) : 0;
+              return availableQty >= needed;
+            });
+            availMap[p.id] = ok;
+          });
+          setAvailability(availMap);
+        } catch (e) {
+          console.warn('Gagal refresh stok availability', e);
+        }
+      })();
+    };
+
+    window.addEventListener('transaksi:created', handler as EventListener);
+    window.addEventListener('transaksi:deleted', handler as EventListener);
+    return () => {
+      window.removeEventListener('transaksi:created', handler as EventListener);
+      window.removeEventListener('transaksi:deleted', handler as EventListener);
+    };
+  }, [products]);
+
   // --- CART LOGIC ---
   const addToCart = (produk: Produk) => {
+    // prevent add if not available
+    if (availability && availability[produk.id] === false) {
+      alert('Stok bahan untuk produk ini tidak mencukupi.');
+      return;
+    }
     setCart((prev) => {
       const existing = prev.find((item) => item.id === produk.id);
       if (existing) {
@@ -60,50 +131,60 @@ const TransaksiView = () => {
 
   const updateQty = (id: number, delta: number) => {
     setCart((prev) => {
-      return prev.map((item) => {
-        if (item.id === id) {
-          const newQty = item.qty + delta;
-          return newQty > 0 ? { ...item, qty: newQty } : item;
-        }
-        return item;
-      });
+      const item = prev.find((it) => it.id === id);
+      if (!item) return prev;
+      const newQty = item.qty + delta;
+      if (newQty <= 0) {
+        return prev.filter((it) => it.id !== id);
+      }
+      return prev.map((it) => (it.id === id ? { ...it, qty: newQty } : it));
     });
   };
 
   const totalHarga = cart.reduce((sum, item) => sum + item.harga * item.qty, 0);
 
   // --- CHECKOUT LOGIC (Updated for Mobile Compatibility) ---
-  const handleCheckout = async () => {
+  // Open checkout modal
+  const handleOpenCheckout = () => {
     if (cart.length === 0) return alert("Keranjang masih kosong!");
-    
-    if (!confirm(`Proses pembayaran senilai Rp ${totalHarga.toLocaleString('id-ID')}?`)) return;
+    setIsCheckoutOpen(true);
+  };
+
+  const handleConfirmCheckout = async () => {
+    if (cart.length === 0) return alert("Keranjang kosong");
 
     setIsProcessing(true);
 
     try {
-      // Struktur Payload Sesuai Mobile
-      const payload = {
-        items: cart.map(item => ({
-          produk_id: item.id,
-          quantity: item.qty,
-          subtotal: item.harga * item.qty
-        })),
-        total_harga: totalHarga,
-        metode_bayar: metodeBayar,
-        uang_dibayar: totalHarga // Asumsi pas, nanti bisa ditambah input uang
-      };
+      const items = cart.map(item => ({ produk_id: item.id, quantity: item.qty, subtotal: item.harga * item.qty }));
 
-      console.log("Sending Checkout Payload:", payload);
-      
-      await api.createTransaksi(payload);
-      
-      alert("Transaksi Berhasil! ✅");
-      setCart([]); // Kosongkan keranjang
+      // Build FormData for backend compatibility (items as JSON string, tanggal, metode_bayar)
+      const form = new FormData();
+      form.append('items', JSON.stringify(items));
+      form.append('total_harga', String(totalHarga));
+      form.append('metode_bayar', metodeBayar === 'QRIS' ? 'qris' : 'tunai');
+      // include timestamp expected by API (format flexible)
+      form.append('tanggal', new Date().toISOString().slice(0,19).replace('T',' '));
+      // uang_dibayar is optional — don't require it; include if provided
+      if (uangDibayar) form.append('uang_dibayar', String(uangDibayar));
+      if (qrisFile) form.append('bukti_qris', qrisFile);
+
+      console.log('Posting FORM transaksi (unified)', { items, total_harga: totalHarga, metode_bayar: metodeBayar, bukti_qris: qrisFile?.name });
+      await api.createTransaksi(form);
+
+      alert('Transaksi Berhasil! ✅');
+      setCart([]);
       setMetodeBayar('TUNAI');
-      
+      setQrisFile(null);
+      setUangDibayar(null);
+      setIsCheckoutOpen(false);
+
+      // Emit event so Riwayat can refresh
+      window.dispatchEvent(new CustomEvent('transaksi:created'));
+
     } catch (error: any) {
-      console.error("Checkout Gagal:", error);
-      alert("Gagal memproses transaksi: " + (error.message || "Server Error"));
+      console.error('Checkout Gagal:', error);
+      alert('Gagal memproses transaksi: ' + (error.message || 'Server Error'));
     } finally {
       setIsProcessing(false);
     }
@@ -139,9 +220,14 @@ const TransaksiView = () => {
                     {filteredProducts.map((produk) => (
                     <div
                         key={produk.id}
-                        onClick={() => addToCart(produk)}
-                        className="bg-white p-3 rounded-2xl border border-[#F1F3E0] cursor-pointer hover:border-[#A1BC98] hover:shadow-md transition-all group flex flex-col"
+                        onClick={() => (availability && availability[produk.id] === false) ? null : addToCart(produk)}
+                        className={`relative bg-white p-3 rounded-2xl border border-[#F1F3E0] ${availability && availability[produk.id] === false ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-[#A1BC98] hover:shadow-md'} transition-all group flex flex-col`}
                     >
+                      {availability && availability[produk.id] === false && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="bg-red-50 text-red-600 px-3 py-1 rounded-full text-sm font-bold border border-red-100">Stok Kurang</div>
+                        </div>
+                      )}
                         <div className="h-32 bg-[#F8FAF7] rounded-xl mb-3 overflow-hidden relative">
                             {produk.image_url ? (
                                 <img src={produk.image_url} alt={produk.nama} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"/>
@@ -242,7 +328,7 @@ const TransaksiView = () => {
               </div>
               
               <button 
-                onClick={handleCheckout}
+                onClick={handleOpenCheckout}
                 disabled={isProcessing || cart.length === 0}
                 className="w-full py-4 bg-[#4A5347] text-white font-bold rounded-xl hover:bg-[#2C3E2D] active:scale-95 transition-all shadow-lg shadow-[#4A5347]/20 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
               >
@@ -255,6 +341,53 @@ const TransaksiView = () => {
            </div>
         </div>
       </div>
+
+      {/* Checkout Modal */}
+      {isCheckoutOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
+            <h3 className="text-lg font-bold mb-3">Konfirmasi Pesanan</h3>
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+              {cart.map((c) => (
+                <div key={c.id} className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="font-semibold">{c.nama} x{c.qty}</div>
+                    <div className="text-xs text-gray-500">Rp {Number(c.harga * c.qty).toLocaleString('id-ID')}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-bold">Rp {Number(c.harga * c.qty).toLocaleString('id-ID')}</div>
+                    <button onClick={() => { removeFromCart(c.id); }} className="text-red-500 text-sm px-2 py-1 rounded-md border border-red-100 bg-red-50">Hapus</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex items-center justify-between">
+              <span className="font-medium">Total</span>
+              <span className="text-2xl font-extrabold">Rp {totalHarga.toLocaleString('id-ID')}</span>
+            </div>
+
+            <div className="mt-4">
+              <div className="flex gap-2">
+                <button onClick={() => setMetodeBayar('TUNAI')} className={`flex-1 py-2 rounded-xl ${metodeBayar === 'TUNAI' ? 'bg-[#A1BC98] text-white' : 'bg-gray-100'}`}>Tunai</button>
+                <button onClick={() => setMetodeBayar('QRIS')} className={`flex-1 py-2 rounded-xl ${metodeBayar === 'QRIS' ? 'bg-[#A1BC98] text-white' : 'bg-gray-100'}`}>QRIS</button>
+              </div>
+
+              {metodeBayar === 'QRIS' && (
+                <div className="mt-3">
+                  <label className="text-xs text-gray-500">Upload Bukti QRIS</label>
+                  <input type="file" accept="image/*" onChange={(e) => setQrisFile(e.target.files?.[0] ?? null)} className="w-full mt-1" />
+                  {qrisFile && <div className="mt-2 text-sm text-gray-600">Terpilih: {qrisFile.name}</div>}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button onClick={() => setIsCheckoutOpen(false)} className="flex-1 py-3 rounded-xl bg-gray-100">Batal</button>
+              <button onClick={handleConfirmCheckout} disabled={isProcessing} className="flex-1 py-3 rounded-xl bg-[#4A5347] text-white">{isProcessing ? 'Memproses...' : 'Konfirmasi & Bayar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

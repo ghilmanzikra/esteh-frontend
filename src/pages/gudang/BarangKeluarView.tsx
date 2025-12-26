@@ -9,8 +9,8 @@ const BarangKeluarView = () => {
   const fetchRequests = async () => {
     try {
         setLoading(true);
-        // Mengambil permintaan stok dari outlet yang masuk ke gudang
-        const res = await api.getPermintaanStok(); 
+        // Mengambil permintaan stok khusus untuk GUDANG
+        const res = await api.getPermintaanStokGudang(); 
         console.log("🔥 PERMINTAAN STOK:", res);
         
         if(res.data) setRequests(res.data);
@@ -34,6 +34,17 @@ const BarangKeluarView = () => {
         fetchRequests();
     } catch(err: any) {
         alert("Gagal: " + err.message);
+    }
+  };
+
+  const handleReject = async (id: number) => {
+    if(!confirm("Tolak permintaan ini?")) return;
+    try {
+      await api.rejectPermintaan(id);
+      alert("Permintaan ditolak.");
+      fetchRequests();
+    } catch (err: any) {
+      alert("Gagal: " + err.message);
     }
   };
 
@@ -83,14 +94,16 @@ const BarangKeluarView = () => {
                       </span>
                     </td>
                     <td className="p-5 text-center">
-                      {req.status === 'pending' && (
+                        {req.status === 'pending' && (
                           <div className="flex justify-center gap-2">
-                            <button onClick={() => handleApprove(req.id)} className="p-2 bg-[#B8E6B8]/30 text-[#2d5a2d] rounded-lg hover:bg-[#B8E6B8] transition-colors" title="Setujui">
-                                <Check size={18} />
-                            </button>
-                            {/* Tombol tolak bisa ditambahkan nanti jika API support */}
+                          <button onClick={() => handleApprove(req.id)} className="p-2 bg-[#B8E6B8]/30 text-[#2d5a2d] rounded-lg hover:bg-[#B8E6B8] transition-colors" title="Setujui">
+                            <Check size={18} />
+                          </button>
+                          <button onClick={() => handleReject(req.id)} className="p-2 bg-[#FFE9E9]/30 text-[#a12b2b] rounded-lg hover:bg-[#FFB8B8] transition-colors" title="Tolak">
+                            <X size={18} />
+                          </button>
                           </div>
-                      )}
+                        )}
                     </td>
                   </tr>
                 ))

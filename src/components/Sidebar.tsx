@@ -39,8 +39,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       { id: 'transaksi', label: 'Kasir / Transaksi', icon: <LayoutGrid size={20} /> },
       { id: 'riwayat', label: 'Riwayat Transaksi', icon: <History size={20} /> },
       { id: 'produk', label: 'Kelola Menu', icon: <ClipboardList size={20} /> },
-      { id: 'stok', label: 'Stok & Request', icon: <Package size={20} /> },
-      { id: 'penerimaan', label: 'Terima Barang', icon: <Truck size={20} /> },
+      { id: 'stok', label: 'Stok Outlet', icon: <Package size={20} /> },
+      { id: 'penerimaan', label: 'Pengajuan', icon: <Truck size={20} /> },
     ],
     gudang: [
       { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={20} /> },
