@@ -14,6 +14,8 @@ const DashboardView = () => {
         const response = await api.getDashboard();
         console.log("🔥 DATA DASHBOARD UPDATE:", response);
         setDashboardData(response);
+        // Activate GET /me for owner dashboard
+        try { await api.getMe(); } catch(_) { /* ignore */ }
       } catch (err: any) {
         console.error("Gagal ambil dashboard:", err);
       } finally {

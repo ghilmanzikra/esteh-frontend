@@ -29,9 +29,10 @@ const BarangKeluarView = () => {
   const handleApprove = async (id: number) => {
     if(!confirm("Setujui permintaan ini dan kirim barang?")) return;
     try {
-        await api.approvePermintaan(id);
+        await api.updatePermintaanStatus(id, 'approved', undefined, true);
         alert("Permintaan disetujui! Barang sedang dikirim.");
         fetchRequests();
+        window.dispatchEvent(new CustomEvent('permintaan:created'));
     } catch(err: any) {
         alert("Gagal: " + err.message);
     }
@@ -40,9 +41,10 @@ const BarangKeluarView = () => {
   const handleReject = async (id: number) => {
     if(!confirm("Tolak permintaan ini?")) return;
     try {
-      await api.rejectPermintaan(id);
+      await api.updatePermintaanStatus(id, 'rejected', undefined, true);
       alert("Permintaan ditolak.");
       fetchRequests();
+      window.dispatchEvent(new CustomEvent('permintaan:created'));
     } catch (err: any) {
       alert("Gagal: " + err.message);
     }

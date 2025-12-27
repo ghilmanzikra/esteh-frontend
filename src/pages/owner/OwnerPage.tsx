@@ -1,5 +1,6 @@
-import React from 'react';
-import { Menu, Bell } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Menu } from 'lucide-react';
+import { api } from '../../services/api';
 import DashboardView from './DashboardView';
 import OutletView from './OutletView';
 import KaryawanView from './KaryawanView';
@@ -57,15 +58,17 @@ const OwnerPage: React.FC<OwnerPageProps> = ({ isMobileOpen, toggleMobile, activ
         </div>
 
         <div className="flex items-center gap-4">
-          <button className="p-3 bg-white text-[#A1BC98] rounded-xl shadow-sm border border-[#E3E9D5] hover:bg-[#A1BC98] hover:text-white transition-all relative">
-            <Bell size={20} />
-            <span className="absolute top-2 right-2.5 w-2 h-2 bg-[#FF7675] rounded-full border border-white"></span>
-          </button>
           <div className="h-10 w-10 bg-[#4A5347] rounded-full border-2 border-white shadow-md flex items-center justify-center text-white font-bold text-sm">
             OW
           </div>
         </div>
       </header>
+
+      {/* activate GET /me for owner dashboard */}
+      {(() => {
+        useEffect(() => { (async () => { try { await api.getMe(); } catch(_){} })(); }, []);
+        return null;
+      })()}
 
       {/* Konten */}
       <main className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 scrollbar-hide">

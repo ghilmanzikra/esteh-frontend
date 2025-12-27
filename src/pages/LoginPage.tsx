@@ -34,13 +34,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         password: password 
       });
 
-      console.log("Login Sukses!", response);
-
       const token = response.token || response.access_token;
 
       if (token) {
         localStorage.setItem('token', token);
-        console.log("Token Tersimpan di LocalStorage:", token); // Log buat mastiin
       } else {
         console.error("Gawat! Token tidak ditemukan di response backend!", response);
         throw new Error("Gagal menyimpan sesi login (Token hilang).");

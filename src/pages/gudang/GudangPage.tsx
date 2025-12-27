@@ -1,5 +1,6 @@
-import React from 'react';
-import { Menu, Bell } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Menu } from 'lucide-react';
+import { api } from '../../services/api';
 import OverviewView from './OverviewView';
 import BarangMasukView from './BarangMasukView';
 import BarangKeluarView from './BarangKeluarView';
@@ -62,15 +63,24 @@ const GudangPage: React.FC<GudangPageProps> = ({ isMobileOpen, toggleMobile, act
         </div>
 
         <div className="flex items-center gap-4">
-          <button className="p-3 bg-white text-[#A1BC98] rounded-xl shadow-sm border border-[#E3E9D5] hover:bg-[#A1BC98] hover:text-white transition-all relative">
-            <Bell size={20} />
-            <span className="absolute top-2 right-2.5 w-2 h-2 bg-[#FF7675] rounded-full border border-white"></span>
-          </button>
           <div className="h-10 w-10 bg-[#A1BC98] rounded-full border-2 border-white shadow-md flex items-center justify-center text-white font-bold text-sm">
             SF
           </div>
         </div>
       </header>
+
+      {/* Fetch user info on mount */}
+      {/** Call GET /me to activate user info for gudang */}
+      {/** eslint-disable-next-line react-hooks/rules-of-hooks */}
+      {(() => {
+        // useEffect inside IIFE to avoid top-level hook ordering changes in this patch
+        useEffect(() => {
+          (async () => {
+            try { await api.getMe(); } catch (_) { /* ignore */ }
+          })();
+        }, []);
+        return null;
+      })()}
 
       {/* Konten Utama */}
       <main className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 scrollbar-hide">

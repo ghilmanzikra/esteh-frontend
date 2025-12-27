@@ -6,6 +6,8 @@ import { LoginResponse, User, Produk, Outlet, DashboardResponse, OutletResponse,
 const DEFAULT_BASE_URL = 'https://esteh-backend-production.up.railway.app/api';
 const rawBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
 const BASE_URL = rawBase ? rawBase.replace(/\/$/, '') : DEFAULT_BASE_URL;
+// API_ORIGIN: base origin without the `/api` suffix, useful for building absolute image URLs
+export const API_ORIGIN = BASE_URL.replace(/\/api(\/)?$/i, '');
 // contoh .env: VITE_API_BASE_URL=http://localhost:5173/api
 
 // ============================================================================
@@ -250,6 +252,13 @@ export const api = {
       method: 'POST', 
       body: JSON.stringify(body) 
     }),
+  
+  // Update / Delete Barang Masuk (Gudang)
+  updateBarangMasuk: (id: number, body: any) =>
+    fetcher<any>(`/gudang/barang-masuk/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  deleteBarangMasuk: (id: number) =>
+    fetcher<any>(`/gudang/barang-masuk/${id}`, { method: 'DELETE' }),
 
   getBarangKeluar: () => 
     fetcher<any>('/gudang/barang-keluar', { 
@@ -284,6 +293,15 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ status: 'rejected' })
     }),
+
+  // Generic helper to update permintaan status. If `forGudang` is true,
+  // it will call the `/gudang/permintaan-stok/{id}` namespace, otherwise
+  // it will call the public `/permintaan-stok/{id}` endpoint.
+  updatePermintaanStatus: (id: number, status: string, extra?: any, forGudang = false) => {
+    const endpoint = forGudang ? `/gudang/permintaan-stok/${id}` : `/permintaan-stok/${id}`;
+    const payload = { status, ...(extra || {}) };
+    return fetcher<any>(endpoint, { method: 'PUT', body: JSON.stringify(payload) });
+  },
   
   // Karyawan/Gudang: Konfirmasi penerimaan barang (opsional bukti_foto)
   terimaBarangKeluar: (id: number, payload?: FormData) => {

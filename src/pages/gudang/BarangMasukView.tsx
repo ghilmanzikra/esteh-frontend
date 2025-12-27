@@ -12,6 +12,7 @@ const BarangMasukView = () => {
     jumlah: '', 
     supplier: '' 
   });
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = async () => {
@@ -37,23 +38,52 @@ const BarangMasukView = () => {
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleAdd = async () => {
+  const handleSubmit = async () => {
     if (!newItem.bahan_id || !newItem.jumlah || !newItem.supplier) return alert("Isi semua data!");
-    
     setSubmitting(true);
     try {
-        await api.createBarangMasuk({
-            bahan_id: parseInt(newItem.bahan_id),
-            jumlah: parseFloat(newItem.jumlah),
-            supplier: newItem.supplier
-        });
-        alert("Stok berhasil ditambahkan!");
+        if (editingId) {
+            await api.updateBarangMasuk(editingId, {
+                bahan_id: parseInt(newItem.bahan_id),
+                jumlah: parseFloat(newItem.jumlah),
+                supplier: newItem.supplier
+            });
+            alert('Data barang masuk diperbarui');
+            setEditingId(null);
+        } else {
+            await api.createBarangMasuk({
+                bahan_id: parseInt(newItem.bahan_id),
+                jumlah: parseFloat(newItem.jumlah),
+                supplier: newItem.supplier
+            });
+            alert("Stok berhasil ditambahkan!");
+        }
         setNewItem({ bahan_id: '', jumlah: '', supplier: '' });
         fetchData();
+        // notify other views
+        window.dispatchEvent(new CustomEvent('permintaan:created'));
     } catch (err: any) {
         alert("Gagal: " + err.message);
     } finally {
         setSubmitting(false);
+    }
+  };
+
+  const handleEdit = (item: any) => {
+    setEditingId(item.id);
+    setNewItem({ bahan_id: String(item.bahan_id || item.bahan?.id || ''), jumlah: String(item.jumlah || ''), supplier: item.supplier || '' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Hapus data barang masuk ini?')) return;
+    try {
+      await api.deleteBarangMasuk(id);
+      alert('Data dihapus');
+      fetchData();
+      window.dispatchEvent(new CustomEvent('permintaan:created'));
+    } catch (err: any) {
+      alert('Gagal hapus: ' + err.message);
     }
   };
 
@@ -63,7 +93,7 @@ const BarangMasukView = () => {
         <h3 className="font-bold text-[#4A5347] mb-4 flex items-center gap-2">
           <Plus size={18} className="text-[#A1BC98]" /> Catat Penerimaan Baru
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="space-y-1">
              <label className="text-xs font-bold text-[#778873]">Pilih Bahan</label>
              <select 
@@ -85,11 +115,11 @@ const BarangMasukView = () => {
              <label className="text-xs font-bold text-[#778873]">Supplier</label>
              <input value={newItem.supplier} onChange={(e) => setNewItem({...newItem, supplier: e.target.value})} type="text" className="w-full px-4 py-2.5 rounded-xl border border-[#D2DCB6]" placeholder="PT..." />
           </div>
-          <div className="flex items-end">
-             <button onClick={handleAdd} disabled={submitting} className="w-full py-2.5 bg-[#A1BC98] text-white rounded-xl font-bold hover:bg-[#8FAC86] disabled:opacity-50">
-                {submitting ? <Loader2 className="animate-spin mx-auto"/> : 'Simpan Data'}
+           <div className="flex items-end">
+             <button onClick={handleSubmit} disabled={submitting} className="w-full py-2.5 bg-[#A1BC98] text-white rounded-xl font-bold hover:bg-[#8FAC86] disabled:opacity-50">
+               {submitting ? <Loader2 className="animate-spin mx-auto"/> : (editingId ? 'Simpan Perubahan' : 'Simpan Data')}
              </button>
-          </div>
+           </div>
         </div>
       </div>
 
@@ -105,6 +135,12 @@ const BarangMasukView = () => {
                     <td className="p-5 font-medium">{item.supplier}</td>
                     <td className="p-5">{item.bahan?.nama || `Bahan #${item.bahan_id}`}</td>
                     <td className="p-5 font-bold text-[#A1BC98]">+{item.jumlah}</td>
+                    <td className="p-5">
+                      <div className="flex gap-2">
+                        <button onClick={() => handleEdit(item)} className="px-3 py-1 rounded bg-yellow-100 text-yellow-800">Edit</button>
+                        <button onClick={() => handleDelete(item.id)} className="px-3 py-1 rounded bg-red-50 text-red-600">Hapus</button>
+                      </div>
+                    </td>
                 </tr>
              ))}
            </tbody>

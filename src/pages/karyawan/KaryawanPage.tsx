@@ -1,5 +1,6 @@
-import React from 'react';
-import { Menu, Bell } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Menu } from 'lucide-react';
+import { api } from '../../services/api';
 
 // --- IMPORT KOMPONEN ASLI (Sudah di-uncomment) ---
 import TransaksiView from './TransaksiView';
@@ -34,6 +35,13 @@ const KaryawanPage: React.FC<KaryawanPageProps> = ({ isMobileOpen, toggleMobile,
     }
   };
 
+  // Activate GET /me on mount to validate token and warm user data
+  useEffect(() => {
+    (async () => {
+      try { await api.getMe(); } catch (_) { /* ignore */ }
+    })();
+  }, []);
+
   return (
     <div className="h-screen flex flex-col bg-[#F1F3E0] overflow-hidden">
       {/* Header Dashboard (Top Bar) */}
@@ -62,10 +70,6 @@ const KaryawanPage: React.FC<KaryawanPageProps> = ({ isMobileOpen, toggleMobile,
         </div>
 
         <div className="flex items-center gap-4">
-          <button className="p-3 bg-white text-[#A1BC98] rounded-xl shadow-sm border border-[#E3E9D5] hover:bg-[#A1BC98] hover:text-white transition-all relative group">
-            <Bell size={20} />
-            <span className="absolute top-2 right-2.5 w-2 h-2 bg-[#FF7675] rounded-full border border-white"></span>
-          </button>
           <div className="h-10 w-10 bg-[#A1BC98] rounded-full border-2 border-white shadow-md flex items-center justify-center text-white font-bold text-sm">
             GH
           </div>
@@ -79,5 +83,6 @@ const KaryawanPage: React.FC<KaryawanPageProps> = ({ isMobileOpen, toggleMobile,
     </div>
   );
 };
+// (effect moved inside component)
 
 export default KaryawanPage;

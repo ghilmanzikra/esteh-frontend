@@ -117,6 +117,8 @@ const PengajuanView = () => {
       const fd = new FormData();
       if (uploadFile) fd.append('bukti_foto', uploadFile);
       await api.terimaBarangKeluar(barangKeluarId, fd);
+      // Update permintaan status to 'diterima' as well
+      try { await api.updatePermintaanStatus(selected.id, 'diterima', undefined, false); } catch(_) { /* best-effort */ }
       alert('Penerimaan dikonfirmasi');
       setIsModalOpen(false);
       fetchHistory();
